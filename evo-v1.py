@@ -55,11 +55,11 @@ ackley_n = 30
 ackley_x_min = -15
 ackley_x_max =  15
 
-gaussian_deviation_min = 2
-gaussian_deviation_max = 8
+gaussian_deviation_min = 0.0001
+gaussian_deviation_max = 12
 learning_rate = 1/math.sqrt(individuals_count)
 
-max_iteration_count = 1000000 #200000
+max_iteration_count = 1000000
 
 
 '''
