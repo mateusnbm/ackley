@@ -56,7 +56,7 @@ ackley_n = 30
 ackley_x_min = -15
 ackley_x_max =  15
 
-gaussian_deviation_min = 0.0001
+gaussian_deviation_min = 0.00001
 gaussian_deviation_max = 12
 learning_rate = 1/math.sqrt(individuals_count)
 

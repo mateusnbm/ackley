@@ -1,50 +1,13 @@
 #
-# evo-v2.py
+# evo-v3.py
 #
-# a. Representação das soluções (indivíduos):
-#
-#    Vetor com [(2*ackley_n)+1] números. Os primeiros ackley_n números codificam
-#    cada x_i da função de Ackley, os  ackley_n seguintes representam o passo de
-#    mutação em cada direção dimensão i e o último número representa o fitness
-#    do indivíduo.
-#
-# b. Função de Fitness:
-#
-#    A função de fitness retorna o resultado dos primeiros ackley_n números do
-#    indivíduo, os x_i, aplicados na função de Ackley.
-#
-# c. População (tamanho, inicialização, etc):
-#
-#    População de 30 indivíduos, inicializados com x_i aleatórios obedecendo
-#    a regra -15 <= x_i <= 15. O desvio padrão é inicializado aleatoriamente
-#    com números entra os argumentos "gaussian_deviation_min" e "...ation_max".
-#
-# d. Processo de seleção:
-#
-#    Os pais são escolhidos aleatoriamente. São gerados 200 filhos, os quais,
-#    podem ser gerados por múltiplos pais, especificamente, de 2 a 15 pais.
-#
-# e. Operadores Genéticos (Recombinação e Mutação)
-#
-#    Recombinação: Os x_i do filho são escolhidos aleatoriamente entre os x_i
-#    dos pais que componhem a família. O passo de mutação de cada dimensão é
-#    atualizado com a média dos pais.
-#
-#    Mutação: Foi implementada a mutação Uncorrelated Mutation with N Step Sizes,
-#    descrita na página 60 do livro do Eiben (segunda edição).
-#
-# f. Processo de seleção por sobrevivência
-#
-#    Processo de seleção geracional, os 30 melhores filhos permanecem.
-#
-# g. Condições de término do Algoritmo Evolucionário
-#
-#    Um milhão de iterações (por hora, número escolhido arbitrariamente).
+# The code comments might be inacurate, I'll update and add the description soon.
 #
 
 
 import math
 import random
+import numpy as np
 
 
 '''
@@ -54,12 +17,17 @@ Parameters.
 individuals_count = 30
 childs_count = 200
 
-ackley_n = 30
+ackley_n = 3#30
 ackley_x_min = -15
 ackley_x_max =  15
 
-gaussian_deviation_min = 0.0001
+gaussian_deviation_min = 0.001
 gaussian_deviation_max = 12
+
+alpha_min = -math.pi
+alpha_max =  math.pi
+
+beta_degress = 5
 
 learning_rate = 1/math.sqrt(2*math.sqrt(individuals_count))
 learning_rate_l = 1/math.sqrt(2*individuals_count)
@@ -72,6 +40,29 @@ Metrics.
 '''
 
 solution = []
+
+
+'''
+The probability density function used by the Correlated Mutation..
+'''
+
+def correlated_mutation_pdf(v, co_m):
+
+    v = np.array(v)
+    co_m = np.array(co_m)
+
+    a = v.transpose().dot(co_m)
+    b = a.dot(v)
+    c = math.exp(-0.5*b)
+
+    d = np.linalg.det(co_m)
+    e = math.pow((2*math.pi), len(v))
+    f = d*e
+    g = math.pow(math.fabs(f), 0.5)*np.sign(f)
+
+    h = c/g
+
+    return h
 
 
 '''
@@ -107,29 +98,31 @@ Assumes the fitness is equal to the ackley function evaluation.
 def fitness(individual):
 
     '''
-    We only need the first "ackley_n" values to evaluate the function,
-    anything after is disregarded, hence, the sublist below.
+    Pass the individual's xi set to the Ackley function.
     '''
 
-    return ackley(individual[:ackley_n])
+    return ackley(individual[0])
 
 
 '''
 Generates a random individual. The individuals are represented as lists of
-floats, composed by: the first "ackley_n" numbers are the solution vector,
-the following "ackley_n" values are the mutation step size in each  direction
-and then a single number representing the individual fitness.
+floats, composed by: the first "ackley_n" numbers are the solution vector, then
+the mutation step size (gaussian standard deviation) and the individual fitness.
 '''
 
 def generateIndividual():
 
-    min = gaussian_deviation_min
-    max = gaussian_deviation_max
+    g_min = gaussian_deviation_min
+    g_max = gaussian_deviation_max
+
+    a_min = alpha_min
+    a_max = alpha_max
 
     x_vals = [random.uniform(ackley_x_min, ackley_x_max) for _ in range(ackley_n)]
-    sigma_vals =  [random.uniform(min, max) for _ in range(ackley_n)]
+    sigma_vals = [random.uniform(g_min, g_max) for _ in range(ackley_n)]
+    alpha_vals = [[random.uniform(a_min, a_max) for _ in range(ackley_n)] for __ in range(ackley_n)]
 
-    individual = x_vals + sigma_vals + [0]
+    individual = [x_vals, sigma_vals, alpha_vals, 0]
     individual[-1] = fitness(individual)
 
     return individual
@@ -176,19 +169,24 @@ for iteration in range(max_iteration_count):
         count = random.randint(2, (individuals_count/2))
         family = [random.choice(population) for _ in range(count)]
 
-        x_vals = [random.choice(family)[k] for k in range(ackley_n)]
-        sigma_vals = [(sum(a[k+ackley_n] for a in family)/count) for k in range(ackley_n)]
+        x_vals = [random.choice(family)[0][k] for k in range(ackley_n)]
+        sigma_vals = [(sum(a[1][k] for a in family)/count) for k in range(ackley_n)]
+        alpha_vals = [[(sum(a[2][m_i][m_j] for a in family)/count) for m_j in range(ackley_n)] for m_i in range(ackley_n)]
 
-        child = x_vals + sigma_vals + [0]
+        child = [x_vals, sigma_vals, alpha_vals, 0]
         child[-1] = fitness(child)
 
         childs.append(child)
 
     '''
-    Mutate childs (Uncorrelated Mutation With N Step Sizes, Eiben Pag. 60).
+    Mutate childs (Correlated Mutation, Eiben Pag. 60).
     '''
 
     for child in childs:
+
+        '''
+        Update mutation steps (sigmas).
+        '''
 
         const_g = random.gauss(0, 1)
 
@@ -198,23 +196,74 @@ for iteration in range(max_iteration_count):
             a = learning_rate_l*const_g
             b = learning_rate*g
 
-            sigma = child[i+ackley_n]
+            sigma = child[1][i]
             sigma_l = sigma*math.exp(a*b)
 
             if sigma_l < gaussian_deviation_min:
 
                 sigma_l = gaussian_deviation_min
 
-            child[i+ackley_n] = sigma_l
+            child[1][i] = sigma_l
+
+        '''
+        Update rotation angles (alphas).
+        '''
 
         for i in range(ackley_n):
 
-            g = random.gauss(0, 1)
-            x = child[i]+(child[i+ackley_n]*g)
+            for j in range(ackley_n):
+
+                g = random.gauss(0, 1)
+                alpha = child[2][i][j]
+                alpha_l = alpha+(beta_degress*g)
+
+                if (math.fabs(alpha_l) > math.pi):
+
+                    alpha_l = alpha_l-(2*math.pi*np.sign(alpha_l))
+
+                child[2][i][j] = alpha_l
+
+        '''
+        Calculate the covariance matrix.
+        '''
+
+        co_m = []
+
+        for i in range(ackley_n):
+
+            co_m.append([])
+
+            for j in range(ackley_n):
+
+                if i == j:
+
+                    #print("(" + str(i) + ", " + str(j) + ") = " + str(child[1][i]) + "^2")
+
+                    val = math.pow(child[1][i], 2)
+
+                else:
+
+                    #print("(" + str(i) + ", " + str(j) + ") = " + str(child[1][i]) + "^2")
+
+                    a = math.pow(child[1][i], 2)-math.pow(child[1][j], 2)
+                    b = math.tan(2*child[2][i][j])
+                    val = 0.5*a*b
+
+                co_m[i].append(val)
+
+
+        '''
+        Update individual objects (x0...xi).
+        '''
+
+        for i in range(ackley_n):
+
+            v = [0 for _ in range(ackley_n)]
+            x = child[0][i]+correlated_mutation_pdf(v, co_m)
 
             if ackley_x_min <= x and x <= ackley_x_max:
 
-                child[i] = x
+                child[0][i] = x
 
         child[-1] = fitness(child)
 
