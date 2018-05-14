@@ -17,17 +17,17 @@ Parameters.
 individuals_count = 30
 childs_count = 200
 
-ackley_n = 3#30
+ackley_n = 30
 ackley_x_min = -15
 ackley_x_max =  15
 
-gaussian_deviation_min = 0.001
-gaussian_deviation_max = 12
+gaussian_deviation_min = 0.0001
+gaussian_deviation_max = 10
 
 alpha_min = -math.pi
 alpha_max =  math.pi
 
-beta_degress = 5
+beta_degress = math.radians(5)
 
 learning_rate = 1/math.sqrt(2*math.sqrt(individuals_count))
 learning_rate_l = 1/math.sqrt(2*individuals_count)
@@ -58,7 +58,7 @@ def correlated_mutation_pdf(v, co_m):
     d = np.linalg.det(co_m)
     e = math.pow((2*math.pi), len(v))
     f = d*e
-    g = math.pow(math.fabs(f), 0.5)*np.sign(f)
+    g = math.pow(math.fabs(f), 0.5)#*np.sign(f)
 
     h = c/g
 
