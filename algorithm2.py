@@ -1,43 +1,45 @@
 #
-# algorithm1.py
+# algorithm2.py
 #
 # a. Representação das soluções (indivíduos):
 #
-#    Vetor com (ackley_n+2) números. Os primeiros "ackley_n" números codificam
-#    cada x_i da função de Ackley, na sequência vem o desvio padrão e o fitness
+#    Vetor com [(2*ackley_n)+1] números. Os primeiros ackley_n números codificam
+#    cada x_i da função de Ackley, os  ackley_n seguintes representam o passo de
+#    mutação em cada direção dimensão i e o último número representa o fitness
 #    do indivíduo.
 #
 # b. Função de Fitness:
 #
-#    A função de fitness retorna o resultado dos primeiros "ackley_n" números do
+#    A função de fitness retorna o resultado dos primeiros ackley_n números do
 #    indivíduo, os x_i, aplicados na função de Ackley.
 #
 # c. População (tamanho, inicialização, etc):
 #
 #    População de 30 indivíduos, inicializados com x_i aleatórios obedecendo
 #    a regra -15 <= x_i <= 15. O desvio padrão é inicializado aleatoriamente
-#    com números entre os argumentos "gaussian_deviation_min" e "...ation_max".
+#    com números entra os argumentos "gaussian_deviation_min" e "...ation_max".
 #
 # d. Processo de seleção:
 #
 #    Os pais são escolhidos aleatoriamente. São gerados 200 filhos, os quais,
 #    podem ser gerados por múltiplos pais, especificamente, de 2 a 15 pais.
 #
-# e. Operadores Genéticos (Recombinação e Mutação):
+# e. Operadores Genéticos (Recombinação e Mutação)
 #
 #    Recombinação: Os x_i do filho são escolhidos aleatoriamente entre os x_i
-#    dos pais que componhem a família. O sigma do filho é a média do dos pais.
+#    dos pais que componhem a família. O passo de mutação de cada dimensão é
+#    atualizado com a média dos pais.
 #
-#    Mutação: Foi implementada a mutação Uncorrelated Mutation with One Step Size,
-#    descrita na página 58 do livro do Eiben (segunda edição).
+#    Mutação: Foi implementada a mutação Uncorrelated Mutation with N Step Sizes,
+#    descrita na página 60 do livro do Eiben (segunda edição).
 #
-# f. Processo de seleção por sobrevivência:
+# f. Processo de seleção por sobrevivência
 #
 #    Processo de seleção geracional, os 30 melhores filhos permanecem.
 #
-# g. Condições de término do Algoritmo Evolucionário:
+# g. Condições de término do Algoritmo Evolucionário
 #
-#    100000 iterações (número escolhido empiricamente).
+#    Um milhão de iterações (por hora, número escolhido arbitrariamente).
 #
 
 
@@ -52,15 +54,17 @@ Parameters.
 '''
 
 individuals_count = 30
-childs_count = 100
+childs_count = 200
 
 ackley_n = 30
 ackley_x_min = -15
 ackley_x_max =  15
 
-gaussian_deviation_min = 0.00000000000000000001
+gaussian_deviation_min = 0.0001
 gaussian_deviation_max = 12
-learning_rate = 1/math.sqrt(individuals_count)
+
+learning_rate = 1/math.sqrt(2*math.sqrt(individuals_count))
+learning_rate_l = 1/math.sqrt(2*individuals_count)
 
 max_iteration_count = 1000
 
@@ -115,16 +119,22 @@ def fitness(individual):
 
 
 '''
-Generates a random individual. An individual is represented as a list
-containing (ackley_n+2) floats. The first "ackley_n" numbers are the x_i, the
-last two represent the individual's mutation step size (std deviation) and fitness.
+Generates a random individual. The individuals are represented as lists of
+floats, composed by: the first "ackley_n" numbers are the solution vector,
+the following "ackley_n" values are the mutation step size in each  direction
+and then a single number representing the individual fitness.
 '''
 
 def generateIndividual():
 
-    x_values = [random.uniform(ackley_x_min, ackley_x_max) for _ in range(ackley_n)]
-    step_size = random.uniform(gaussian_deviation_min, gaussian_deviation_max)
-    individual = x_values + [step_size, fitness(x_values)]
+    min = gaussian_deviation_min
+    max = gaussian_deviation_max
+
+    x_vals = [random.uniform(ackley_x_min, ackley_x_max) for _ in range(ackley_n)]
+    sigma_vals =  [random.uniform(min, max) for _ in range(ackley_n)]
+
+    individual = x_vals + sigma_vals + [0]
+    individual[-1] = fitness(individual)
 
     return individual
 
@@ -168,7 +178,7 @@ for iteration in range(max_iteration_count):
     Print the current iteration and the best fitness found.
     '''
 
-    print("{:6.0f}".format(iteration+1) + " " + str(solution[-1]))
+    print("{:7.0f}".format(iteration+1) + " " + str(solution[-1]))
 
     '''
     Parents selection & Recombination. We adopt a global recombination strategy
@@ -176,7 +186,7 @@ for iteration in range(max_iteration_count):
     recombination for the strategy parameters. So, basically, each family can
     have multiple parents generating a child whose alleles [x1...xi] are
     selected randomically from their parents and the strategy parameters are
-    averages from the parents.
+    averaged.
     '''
 
     childs = []
@@ -186,36 +196,46 @@ for iteration in range(max_iteration_count):
         count = random.randint(2, (individuals_count/2))
         family = [random.choice(population) for _ in range(count)]
 
-        x_values = [random.choice(family)[k] for k in range(ackley_n)]
-        step_size = sum(a[-2] for a in family)/count
-        child = x_values + [step_size, fitness(x_values)]
+        x_vals = [random.choice(family)[k] for k in range(ackley_n)]
+        sigma_vals = [(sum(a[k+ackley_n] for a in family)/count) for k in range(ackley_n)]
+
+        child = x_vals + sigma_vals + [0]
+        child[-1] = fitness(child)
 
         childs.append(child)
 
     '''
-    Mutate childs using the Uncorrelated Mutation With One Step Size.
+    Mutate childs (Uncorrelated Mutation With N Step Sizes, Eiben Pag. 60).
     '''
 
     for child in childs:
 
-        g = random.gauss(0, 1)
-        sigma = child[-2]
-        sigma_l = sigma*math.exp(learning_rate*g)
-
-        if sigma_l < gaussian_deviation_min:
-
-            sigma_l = gaussian_deviation_min
+        const_g = random.gauss(0, 1)
 
         for i in range(ackley_n):
 
             g = random.gauss(0, 1)
-            x = child[i]+(sigma_l*g)
+            a = learning_rate_l*const_g
+            b = learning_rate*g
+
+            sigma = child[i+ackley_n]
+            sigma_l = sigma*math.exp(a+b)
+
+            if sigma_l < gaussian_deviation_min:
+
+                sigma_l = gaussian_deviation_min
+
+            child[i+ackley_n] = sigma_l
+
+        for i in range(ackley_n):
+
+            g = random.gauss(0, 1)
+            x = child[i]+(child[i+ackley_n]*g)
 
             if ackley_x_min <= x and x <= ackley_x_max:
 
                 child[i] = x
 
-        child[-2] = sigma_l
         child[-1] = fitness(child)
 
     '''
@@ -270,16 +290,16 @@ plot.figure()
 plot.plot(sampled_axis, sampled_bests)
 plot.xlabel("Iteration")
 plot.ylabel("Best Fitness")
-plot.savefig("results/algorithm1-best.png", bbox_inches="tight")
+plot.savefig("results/algorithm2-best.png", bbox_inches="tight")
 
 plot.figure()
 plot.plot(sampled_axis, sampled_averages)
 plot.xlabel("Iteration")
 plot.ylabel("Fitness Averages")
-plot.savefig("results/algorithm1-averages.png", bbox_inches="tight")
+plot.savefig("results/algorithm2-averages.png", bbox_inches="tight")
 
 plot.figure()
 plot.plot(sampled_axis, sampled_deviations)
 plot.xlabel("Iteration")
 plot.ylabel("Fitness Standard Deviations")
-plot.savefig("results/algorithm1-deviations.png", bbox_inches="tight")
+plot.savefig("results/algorithm2-deviations.png", bbox_inches="tight")
