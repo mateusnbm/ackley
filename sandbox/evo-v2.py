@@ -199,7 +199,7 @@ for iteration in range(max_iteration_count):
             b = learning_rate*g
 
             sigma = child[i+ackley_n]
-            sigma_l = sigma*math.exp(a*b)
+            sigma_l = sigma*math.exp(a+b)
 
             if sigma_l < gaussian_deviation_min:
 
